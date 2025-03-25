@@ -1,0 +1,52 @@
+import os
+import requests
+from bs4 import BeautifulSoup
+import zipfile
+
+def download_pdf(url, filename):
+    response = requests.get(url, stream=True, timeout=10)
+    if response.status_code == 200:
+        with open(filename, 'wb') as file:
+            for chunk in response.iter_content(1024):
+                file.write(chunk)
+        print(f"Download concluído: {filename}")
+    else:
+        print(f"Erro ao baixar {filename}")
+
+def main():
+    base_url = "https://www.gov.br"
+    page_url = "https://www.gov.br/ans/pt-br/acesso-a-informacao/participacao-da-sociedade/atualizacao-do-rol-de-procedimentos"
+    
+    response = requests.get(page_url)
+    if response.status_code != 200:
+        print("Erro ao acessar a página da ANS")
+        return
+    
+    soup = BeautifulSoup(response.text, 'html.parser')
+    pdf_links = []
+    for link in soup.find_all('a', href=True):
+        href = link['href']
+        if "anexo-i" in href.lower() or "anexo-ii" in href.lower():
+            pdf_links.append(base_url + href)
+    
+    if not pdf_links:
+        print("Nenhum anexo encontrado.")
+        return
+    
+    pdf_filenames = []
+    for pdf_url in pdf_links:
+        filename = pdf_url.split("/")[-1]
+        download_pdf(pdf_url, filename)
+        pdf_filenames.append(filename)
+    
+    zip_filename = "anexos_ans.zip"
+    with zipfile.ZipFile(zip_filename, 'w') as zipf:
+        for pdf in pdf_filenames:
+            zipf.write(pdf)
+            arcname=os.path.basename(pdf)
+            os.remove(pdf)  # Remove os PDFs após compactação
+    
+    print(f"Arquivo compactado: {zip_filename}")
+
+if __name__ == "__main__":
+    main()
